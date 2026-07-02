@@ -166,10 +166,10 @@ def get_today():
             }
 
     # 板块排名
-    sectors = sched.get_cached_sectors()
+    sectors = sched.get_cached_sectors() or {}
 
     # 题材热度
-    themes = sched.get_cached_themes()
+    themes = sched.get_cached_themes() or {}
 
     # 大盘指数
     try:
@@ -181,6 +181,12 @@ def get_today():
     if not sectors.get("top"):
         try:
             sectors = fetcher.industry_comparison(10)
+        except Exception:
+            pass
+    if not themes:
+        try:
+            hot = fetcher.ths_hot_reason()
+            themes = fetcher.get_hot_themes(hot)
         except Exception:
             pass
 
@@ -206,8 +212,9 @@ def get_realtime(code: str):
 
 
 @app.post("/api/realtime/batch")
-def get_realtime_batch(codes: list):
+async def get_realtime_batch(data: dict):
     """批量获取实时行情"""
+    codes = data.get("codes", [])
     try:
         quotes = fetcher.tencent_quote(codes)
         return list(quotes.values())
@@ -396,10 +403,23 @@ def get_status():
         "scheduler_jobs": [
             {"id": j.id, "next_run": str(j.next_run_time)} for j in jobs
         ],
-        "sectors_cached": sched.get_cached_sectors().get("total", 0),
-        "themes_cached": len(sched.get_cached_themes()),
+        "sectors_cached": (sched.get_cached_sectors() or {}).get("total", 0),
+        "themes_cached": len(sched.get_cached_themes() or {}),
         "server_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
+
+
+
+
+# ════════════════════════════════════════════════════════════
+# 静态文件服务：提供前端构建产物
+# ════════════════════════════════════════════════════════════
+import os
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'frontend', 'dist')
+if os.path.isdir(STATIC_DIR):
+    from fastapi.staticfiles import StaticFiles
+    app.mount('/', StaticFiles(directory=STATIC_DIR, html=True), name='frontend')
+    print(f'前端静态文件已加载: {STATIC_DIR}')
 
 
 # ════════════════════════════════════════════════════════════

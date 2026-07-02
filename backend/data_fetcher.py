@@ -147,36 +147,56 @@ def ths_hot_reason(date_str: str = None) -> list:
     return result
 
 
-def get_hot_themes(stocks: list = None) -> dict:
+def get_hot_themes(stocks: list = None, top_n: int = 15) -> dict:
     """
     从同花顺热点数据中提取热门题材。
+    过滤无效题材，按热度排序。
     返回: {theme: {count, avg_zhangfu, stocks: [...]}, ...}
     """
     if stocks is None:
         stocks = ths_hot_reason()
+
+    # 过滤词：包含这些词的题材跳过
+    FILTER_WORDS = ["ST", "st", "退市", "风险警示"]
+
+    def is_valid(theme: str) -> bool:
+        if len(theme) <= 1:
+            return False
+        for w in FILTER_WORDS:
+            if w in theme:
+                return False
+        return True
 
     theme_map = {}
     for s in stocks:
         reasons = str(s.get("reason", "")).split("+")
         for r in reasons:
             r = r.strip()
-            if not r or r == "nan":
+            if not r or r == "nan" or not is_valid(r):
                 continue
             if r not in theme_map:
                 theme_map[r] = {"count": 0, "total_zhangfu": 0, "stocks": []}
             theme_map[r]["count"] += 1
             theme_map[r]["total_zhangfu"] += float(s.get("zhangfu", 0) or 0)
-            theme_map[r]["stocks"].append(s["name"])
+            stock_name = s.get("name", "")
+            if stock_name and stock_name not in theme_map[r]["stocks"]:
+                theme_map[r]["stocks"].append(stock_name)
 
-    # 按股票数量排序
-    sorted_themes = sorted(theme_map.items(), key=lambda x: -x[1]["count"])
+    # 综合热度排序：count * (1 + avg_zhangfu/10)
+    def hot_score(item):
+        theme, data = item
+        avg_zf = data["total_zhangfu"] / data["count"] if data["count"] > 0 else 0
+        return data["count"] * (1 + abs(avg_zf) / 10)
+
+    sorted_themes = sorted(theme_map.items(), key=hot_score, reverse=True)
+
     result = {}
-    for theme, data in sorted_themes:
+    for theme, data in sorted_themes[:top_n]:
         avg_zhangfu = round(data["total_zhangfu"] / data["count"], 2) if data["count"] > 0 else 0
         result[theme] = {
             "count": data["count"],
             "avg_zhangfu": avg_zhangfu,
-            "stocks": data["stocks"][:5],  # 每题材最多5只代表股
+            "stocks": data["stocks"][:5],
         }
     return result
 
@@ -443,15 +463,48 @@ def get_stock_profile(code: str) -> dict:
 # 8. 获取大盘指数
 # ════════════════════════════════════════════════════════════
 def get_market_index():
-    """获取主要指数行情"""
-    codes = ["000001", "000300", "399006", "000688"]
-    quotes = tencent_quote(codes)
-    return {
-        "sh": quotes.get("000001", {}),      # 上证
-        "hs300": quotes.get("000300", {}),    # 沪深300
-        "cyb": quotes.get("399006", {}),      # 创业板
-        "kc50": quotes.get("000688", {}),     # 科创50
+    """获取主要指数行情（使用腾讯s_接口）"""
+    import urllib.request
+    index_map = {
+        "sh": "s_sh000001",      # 上证
+        "hs300": "s_sh000300",    # 沪深300
+        "cyb": "s_sz399006",      # 创业板
+        "kc50": "s_sh000688",     # 科创50
     }
+    url = "https://qt.gtimg.cn/q=" + ",".join(index_map.values())
+    req = urllib.request.Request(url)
+    req.add_header("User-Agent", UA)
+    resp = urllib.request.urlopen(req, timeout=10)
+    data = resp.read().decode("gbk")
+
+    result = {}
+    for key, code_key in [("sh", "sh000001"), ("hs300", "sh000300"), ("cyb", "sz399006"), ("kc50", "sh000688")]:
+        result[key] = {}
+
+    for line in data.strip().split(";"):
+        if not line.strip() or "=" not in line or '"' not in line:
+            continue
+        key = line.split("=")[0].split("_")[-1]
+        vals = line.split('"')[1].split("~")
+        if len(vals) < 6:
+            continue
+        # s_接口格式: 1~名称~代码~现价~涨跌额~涨跌幅~...
+        code = vals[2]
+        name = vals[1]
+        price = float(vals[3]) if vals[3] else 0
+        change_amt = float(vals[4]) if vals[4] else 0
+        change_pct = float(vals[5]) if vals[5] else 0
+
+        for label, code_key in index_map.items():
+            if key == code_key or code in code_key:
+                result[label] = {
+                    "code": code,
+                    "name": name,
+                    "price": price,
+                    "change_amt": change_amt,
+                    "change_pct": change_pct,
+                }
+    return result
 
 
 # ════════════════════════════════════════════════════════════

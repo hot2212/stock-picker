@@ -151,11 +151,17 @@ def job_update_themes():
 
 def get_cached_sectors():
     """获取缓存的板块排名"""
-    return _cache.get("sectors", {"top": [], "bottom": [], "total": 0})
+    sectors = _cache.get("sectors")
+    if sectors is None:
+        return {"top": [], "bottom": [], "total": 0}
+    return sectors
 
 def get_cached_themes():
     """获取缓存的题材热度"""
-    return _cache.get("themes", {})
+    themes = _cache.get("themes")
+    if themes is None:
+        return {}
+    return themes
 
 
 # ════════════════════════════════════════════════════════════
