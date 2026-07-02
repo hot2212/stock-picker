@@ -486,11 +486,18 @@ def get_today_picks():
     afternoon_yesterday = [dict(row) for row in cur.fetchall()]
 
     conn.close()
+    now_hour = datetime.now().hour
+    now_min = datetime.now().minute
+    afternoon_time_passed = (now_hour > 14) or (now_hour == 14 and now_min >= 30)
+
     return {
         "date": today,
         "morning": morning,
         "afternoon_today": afternoon_today,
         "afternoon_yesterday": afternoon_yesterday,
         "morning_ready": len(morning) > 0,
-        "afternoon_ready": len(afternoon_today) > 0
+        "morning_ran": True,  # 已过9:27说明已执行
+        "afternoon_ready": len(afternoon_today) > 0,
+        "afternoon_ran": afternoon_time_passed,  # 是否已过14:30
+        "afternoon_has_result": len(afternoon_today) > 0,
     }

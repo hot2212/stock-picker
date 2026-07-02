@@ -34,7 +34,8 @@
               </tbody>
             </table>
           </div>
-          <div v-else class="empty">⏳ 等待 9:27 选股...</div>
+          <div v-else-if="todayData.morning_ran === false && todayData.morning_ready === false" class="empty">⏳ 等待 9:27 选股...</div>
+          <div v-else class="empty" style="color:#888">今日无符合条件股票</div>
         </div>
 
         <!-- 昨日尾盘（实时跟踪） -->
@@ -65,7 +66,7 @@
       <div>
         <!-- 今日尾盘 -->
         <div class="card">
-          <div class="card-title">🌆 今日尾盘（14:30）<span v-if="todayData.afternoon_ready" class="badge badge-up" style="margin-left:8px">已更新</span></div>
+          <div class="card-title">🌆 今日尾盘（14:30）<span v-if="todayData.afternoon_has_result" class="badge badge-up" style="margin-left:8px">已更新</span></div>
           <div v-if="todayData.afternoon_today && todayData.afternoon_today.length > 0">
             <table class="data-table">
               <thead><tr><th>#</th><th>代码</th><th>名称</th><th>选股价</th><th>涨幅</th><th>主力净流入</th><th>理由</th></tr></thead>
@@ -82,7 +83,8 @@
               </tbody>
             </table>
           </div>
-          <div v-else class="empty">⏳ 等待 14:30 尾盘选股...</div>
+          <div v-else-if="!todayData.afternoon_ran" class="empty">⏳ 等待 14:30 尾盘选股...</div>
+          <div v-else class="empty" style="color:#888">今日无符合条件股票</div>
         </div>
 
         <!-- 热门板块 -->

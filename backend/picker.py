@@ -174,6 +174,7 @@ def afternoon_pick() -> list:
     results = []
 
     # ── 第1步：获取热门板块和热点股 ──
+    sector_data = None
     try:
         sector_data = fetcher.industry_comparison(AfternoonPick.SECTOR_RANK_TOP_N)
         top_sectors = [s["name"] for s in sector_data.get("top", [])]
@@ -214,34 +215,39 @@ def afternoon_pick() -> list:
     if not candidates:
         return []
 
-    # ── 第2步：获取实时行情 ──
+    # ── 第2步：获取实时行情（主力数据源） ──
     codes = list(candidates.keys())
     try:
         quotes = fetcher.tencent_quote(codes)
     except Exception:
         quotes = {}
 
-    # ── 第3步：逐只筛选 ──
+    # ── 第3步：逐只筛选（用腾讯实时数据做判断） ──
     picked = []
     for code, stock in candidates.items():
         q = quotes.get(code, {})
-        name = stock.get("name", "")
-        price = q.get("price", stock.get("close", 0))
-        change_pct = q.get("change_pct", stock.get("zhangfu", 0))
+        name = q.get("name", stock.get("name", ""))
+        price = q.get("price", 0)
+        change_pct = q.get("change_pct", 0)
         amount_wan = q.get("amount_wan", 0)
-        turnover_pct = q.get("turnover_pct", stock.get("huanshou", 0))
+        turnover_pct = q.get("turnover_pct", 0)
         vol_ratio = q.get("vol_ratio", 1)
         reason_tags = stock.get("reason", "")
 
-        # 涨幅过滤
+        # 过滤ST股
+        import re as _re
+        if _re.search(r'ST|退市', str(name)):
+            continue
+
+        # 涨幅过滤：>1% 但未涨停（明天还有空间）
         if change_pct < AfternoonPick.PRICE_CHANGE_MIN * 100 or change_pct > AfternoonPick.PRICE_CHANGE_MAX * 100:
             continue
 
-        # 成交额过滤
+        # 成交额过滤：>1亿（流动性）
         if amount_wan < AfternoonPick.TURNOVER_MIN / 10000:
             continue
 
-        # 换手率过滤
+        # 换手率过滤：3-25% 活跃度适中
         if turnover_pct < AfternoonPick.TURNOVER_RATE_MIN * 100 or turnover_pct > AfternoonPick.TURNOVER_RATE_MAX * 100:
             continue
 
