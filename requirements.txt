@@ -1,0 +1,9 @@
+# 短线选股系统 - Python依赖
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+apscheduler>=3.10.0
+requests>=2.31.0
+pandas>=2.0.0
+mootdx>=0.10.0
+# 仅用于技术指标计算（可选）
+# stockstats>=0.4.1
